@@ -1,0 +1,23 @@
+# secrets
+.env
+*.env.local
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+# runtime data
+data/
+logs/
+backups/
+*.sqlite
+*.sqlite3
+research/cache/
+reports/
+
+# third-party skillset (installed separately, MIT, tradermonty/claude-trading-skills)
+.claude/skills/
+/skills
+
