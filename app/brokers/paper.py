@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -25,7 +25,7 @@ from app.core.config import Settings, get_settings
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class PaperBroker(BrokerAdapter):
@@ -164,14 +164,14 @@ class PaperBroker(BrokerAdapter):
         if side in ("buy", "sell") and stop is None:
             raise NakedEntryError("Every entry order must attach a stop-loss (no naked entries).")
 
-        half_spread = self.s.paper_spread / Decimal("2")
+        half_spread = self.s.paper_spread / Decimal(2)
         slip = self.s.paper_slippage + half_spread
         is_buy_leg = side in ("buy", "close_short")
         fill_px = (price_hint + slip) if is_buy_leg else (price_hint - slip)
         fill_px = fill_px.quantize(Decimal("0.0001"))
 
         now = _now()
-        realized = Decimal("0")
+        realized = Decimal(0)
         with self._conn() as c:
             pos = c.execute("SELECT * FROM positions WHERE symbol=?", (symbol,)).fetchone()
             cash_row = c.execute("SELECT cash_balance FROM account WHERE id=1").fetchone()
@@ -200,13 +200,13 @@ class PaperBroker(BrokerAdapter):
                 )
             else:
                 if pos is None:
-                    qty = Decimal("0")
-                    fee = Decimal("0")
+                    qty = Decimal(0)
+                    fee = Decimal(0)
                 else:
                     pos_qty = Decimal(pos["qty"])
                     qty = pos_qty if qty <= 0 or qty > pos_qty else qty
                     avg_px = Decimal(pos["avg_price"])
-                    sign = Decimal("1") if pos["direction"] == "long" else Decimal("-1")
+                    sign = Decimal(1) if pos["direction"] == "long" else Decimal(-1)
                     realized = ((fill_px - avg_px) * sign * qty).quantize(Decimal("0.000001"))
                     fee = (qty * self.s.paper_fee_per_unit).quantize(Decimal("0.000001"))
                     cash = cash + realized - fee
@@ -300,7 +300,7 @@ class PaperBroker(BrokerAdapter):
             qty = Decimal(r["qty"])
             avg = Decimal(r["avg_price"])
             last = Decimal(r["last_price"])
-            sign = Decimal("1") if r["direction"] == "long" else Decimal("-1")
+            sign = Decimal(1) if r["direction"] == "long" else Decimal(-1)
             upnl = ((last - avg) * sign * qty).quantize(Decimal("0.000001"))
             out.append(
                 BrokerPosition(
@@ -320,7 +320,7 @@ class PaperBroker(BrokerAdapter):
         with self._conn() as c:
             row = c.execute("SELECT cash_balance FROM account WHERE id=1").fetchone()
         cash = Decimal(row["cash_balance"])
-        upnl = sum((p.unrealized_pnl for p in self.positions()), Decimal("0"))
+        upnl = sum((p.unrealized_pnl for p in self.positions()), Decimal(0))
         return BrokerBalance(
             currency=self.s.base_currency,
             cash_balance=cash,

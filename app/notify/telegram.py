@@ -3,7 +3,7 @@ and never crash trading when Telegram is unconfigured or unreachable."""
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -20,7 +20,7 @@ class Notifier:
 
     def send(self, event_type: str, message: str) -> bool:
         entry = {
-            "ts": datetime.now(timezone.utc).isoformat(),
+            "ts": datetime.now(UTC).isoformat(),
             "event_type": event_type,
             "message": message,
         }

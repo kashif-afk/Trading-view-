@@ -11,7 +11,7 @@ Flow:
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import threading
 from decimal import Decimal
 from typing import Any, Literal
 
@@ -44,7 +44,7 @@ class WebhookPayload(BaseModel):
     symbol: str = Field(min_length=1, max_length=32)
     exchange: str = Field(default="OANDA", max_length=32)
     action: Literal["buy", "sell", "close_long", "close_short"]
-    price: Decimal = Field(gt=Decimal("0"))
+    price: Decimal = Field(gt=Decimal(0))
     stop: Decimal | None = None
     target: Decimal | None = None
     timeframe: str = Field(default="15m", max_length=16)
@@ -53,19 +53,44 @@ class WebhookPayload(BaseModel):
     indicators: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def _validate_stops(self) -> "WebhookPayload":
+    def _validate_stops(self) -> WebhookPayload:
         if self.action in ("buy", "sell") and self.stop is None:
             raise ValueError("Entry signals (buy/sell) must include a non-null stop price.")
         return self
 
 
-def _redacted_payload(p: WebhookPayload) -> dict[str, Any]:
+_PIPELINE_LOCK = threading.RLock()
+
+
+def _redacted_payload(p: WebhookPayload, extra: dict[str, Any] | None = None) -> dict[str, Any]:
     d = p.model_dump(mode="json")
     d["secret"] = "***"
+    if extra:
+        d.update(extra)
     return d
 
 
 def process_webhook_signal(
+    payload: WebhookPayload,
+    *,
+    settings: Settings | None = None,
+    broker: BrokerAdapter | None = None,
+    embedder: EmbeddingService | None = None,
+    force_db_down: bool = False,
+    upcoming_news_events: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    with _PIPELINE_LOCK:
+        return _process_webhook_signal_locked(
+            payload,
+            settings=settings,
+            broker=broker,
+            embedder=embedder,
+            force_db_down=force_db_down,
+            upcoming_news_events=upcoming_news_events,
+        )
+
+
+def _process_webhook_signal_locked(
     payload: WebhookPayload,
     *,
     settings: Settings | None = None,
@@ -83,7 +108,8 @@ def process_webhook_signal(
 
     # --- Fallback path when PostgreSQL is unreachable ---
     if force_db_down or not db_healthy(s):
-        inserted = outbox.enqueue_signal(payload.signal_id, _redacted_payload(payload))
+        mode_tag = "exit_when_db_down" if is_exit else "entry_blocked_db_down"
+        inserted = outbox.enqueue_signal(payload.signal_id, _redacted_payload(payload, {"_outbox_mode": mode_tag}))
         if not inserted:
             return {"status": "duplicate", "signal_id": payload.signal_id, "reason": "duplicate_in_outbox"}
         if is_exit:
@@ -92,7 +118,7 @@ def process_webhook_signal(
                     client_order_id=f"ord-{payload.signal_id}",
                     symbol=broker_sym,
                     side=payload.action,
-                    qty=Decimal("0"),
+                    qty=Decimal(0),
                     price_hint=payload.price,
                     stop=None,
                     target=None,
@@ -143,7 +169,7 @@ def process_webhook_signal(
             b_positions = brk.positions()
             equity = bal.equity
             open_count = len(b_positions)
-            open_notional = sum((p.qty * p.avg_price for p in b_positions), Decimal("0"))
+            open_notional = sum((p.qty * p.avg_price for p in b_positions), Decimal(0))
         except BrokerError as e:
             notifier.send("broker_error", f"Broker unreachable on {payload.signal_id}: {e}")
             if is_exit:
@@ -229,11 +255,16 @@ def process_webhook_signal(
         # Sizing (for entries) or position lookup (for exits)
         size_mult = Decimal("0.5") if (advisory.get("caution_triggered") and advisory.get("caution_action") == "halve") else Decimal("1.0")
         if is_exit:
-            open_pos = db.query(PositionRecord).filter_by(symbol=broker_sym, state="open").one_or_none()
-            qty = Decimal(str(open_pos.qty)) if open_pos else Decimal("0")
-            risk_usd = Decimal("0")
+            open_pos = (
+                db.query(PositionRecord)
+                .filter_by(symbol=broker_sym, state="open")
+                .order_by(PositionRecord.opened_at.asc())
+                .first()
+            )
+            qty = Decimal(str(open_pos.qty)) if open_pos else Decimal(0)
+            risk_usd = Decimal(0)
         else:
-            max_add_notional = max(Decimal("0"), equity * (s.max_exposure_pct / Decimal("100")) - open_notional)
+            max_add_notional = max(Decimal(0), equity * (s.max_exposure_pct / Decimal(100)) - open_notional)
             sz = calculate_position_size(
                 equity=equity,
                 risk_pct=s.risk_per_trade_pct,
@@ -337,7 +368,7 @@ def _execute_order_in_session(
     brk: BrokerAdapter,
     settings: Settings,
     embedder: EmbeddingService | None = None,
-    risk_usd: Decimal = Decimal("10"),
+    risk_usd: Decimal = Decimal(10),
 ) -> dict[str, Any]:
     notifier = get_notifier(settings)
     try:
@@ -401,7 +432,7 @@ def _execute_order_in_session(
                 avg_entry_price=res.fill_price,
                 stop=Decimal(str(ord_rec.stop)),
                 target=Decimal(str(ord_rec.target)) if ord_rec.target is not None else None,
-                initial_risk_usd=risk_usd if risk_usd > 0 else Decimal("10"),
+                initial_risk_usd=risk_usd if risk_usd > 0 else Decimal(10),
                 entry_signal_id=sig.signal_id,
                 state="open",
                 fees_paid=res.fee,
@@ -412,14 +443,19 @@ def _execute_order_in_session(
             db.flush()
             notifier.send("fill", f"Opened {pos.direction} {pos.qty} {pos.symbol} @ {pos.avg_entry_price} (SL={pos.stop})")
         else:
-            pos = db.query(PositionRecord).filter_by(symbol=res.symbol, state="open").one_or_none()
-            if pos:
-                pos.state = "closed"
-                pos.exit_price = res.fill_price
-                pos.exit_reason = ord_rec.reason or "exit"
-                pos.realized_pnl = res.realized_pnl
-                pos.fees_paid = Decimal(str(pos.fees_paid)) + res.fee
-                pos.closed_at = res.filled_at
+            open_pos = (
+                db.query(PositionRecord)
+                .filter_by(symbol=res.symbol, state="open")
+                .order_by(PositionRecord.opened_at.asc())
+                .first()
+            )
+            if open_pos:
+                open_pos.state = "closed"
+                open_pos.exit_price = res.fill_price
+                open_pos.exit_reason = ord_rec.reason or "exit"
+                open_pos.realized_pnl = res.realized_pnl
+                open_pos.fees_paid = Decimal(str(open_pos.fees_paid)) + res.fee
+                open_pos.closed_at = res.filled_at
                 if res.realized_pnl != 0:
                     record_entry(
                         db,
@@ -428,13 +464,13 @@ def _execute_order_in_session(
                         amount=abs(res.realized_pnl),
                         currency=settings.base_currency,
                         ref=ord_rec.client_order_id,
-                        note=f"Closed {pos.direction} {pos.symbol} ({pos.exit_reason})",
+                        note=f"Closed {open_pos.direction} {open_pos.symbol} ({open_pos.exit_reason})",
                         broker_txn_id=f"{res.broker_fill_id}-PNL",
                     )
-                entry_sig = db.query(SignalRecord).filter_by(signal_id=pos.entry_signal_id).one_or_none()
+                entry_sig = db.query(SignalRecord).filter_by(signal_id=open_pos.entry_signal_id).one_or_none()
                 record_closed_trade_journal(
                     db,
-                    pos=pos,
+                    pos=open_pos,
                     signal=entry_sig or sig,
                     slippage_usd=res.slippage,
                     settings=settings,
@@ -447,8 +483,8 @@ def _execute_order_in_session(
                 except Exception:
                     pass
                 notifier.send(
-                    "stop_hit" if pos.exit_reason == "stop" else "fill",
-                    f"Closed {pos.direction} {pos.qty} {pos.symbol} @ {pos.exit_price} PnL=${pos.realized_pnl:.2f}",
+                    "stop_hit" if open_pos.exit_reason == "stop" else "fill",
+                    f"Closed {open_pos.direction} {open_pos.qty} {open_pos.symbol} @ {open_pos.exit_price} PnL=${open_pos.realized_pnl:.2f}",
                 )
 
     return {

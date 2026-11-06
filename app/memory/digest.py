@@ -7,8 +7,7 @@ at least 30 trades of evidence before a rule change can be proposed or approved)
 from __future__ import annotations
 
 from collections import Counter
-from datetime import datetime, timezone
-from decimal import Decimal
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -116,7 +115,7 @@ def generate_weekly_learning_digest(db: Session) -> dict[str, Any]:
     metrics = compute_performance_metrics(db)
     mistakes = metrics["mistake_counts"]
     non_win = {k: v for k, v in mistakes.items() if k != "clean_win"}
-    top_mistake = max(non_win, key=non_win.get) if non_win else None
+    top_mistake = max(non_win, key=lambda k: non_win[k]) if non_win else None
 
     proposal_created = None
     if top_mistake and metrics["total_trades"] >= MIN_EVIDENCE_TRADES:
@@ -146,7 +145,7 @@ def generate_weekly_learning_digest(db: Session) -> dict[str, Any]:
             proposal_created = prop.id
 
     return {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "metrics": metrics,
         "top_recurring_mistake": top_mistake,
         "proposal_id": proposal_created,
@@ -161,6 +160,6 @@ def approve_rule_change_proposal(db: Session, proposal_id: int, approver: str) -
         )
     prop.status = "approved"
     prop.approved_by = approver
-    prop.approved_at = datetime.now(timezone.utc)
+    prop.approved_at = datetime.now(UTC)
     db.flush()
     return prop

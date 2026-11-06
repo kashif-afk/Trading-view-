@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import csv
 import io
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -86,7 +86,7 @@ def record_entry(
             return dup
 
     row = LedgerEntry(
-        ts=ts or datetime.now(timezone.utc),
+        ts=ts or datetime.now(UTC),
         type=entry_type,
         direction=direction,
         amount=amt,
@@ -116,18 +116,18 @@ def compute_waterfall(
         return Decimal(str(r.amount)) if r.direction == "in" else -Decimal(str(r.amount))
 
     def _norm(dt: datetime) -> datetime:
-        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
-    starting_balance = Decimal("0")
+    starting_balance = Decimal(0)
     buckets: dict[str, Decimal] = {
-        "deposits": Decimal("0"),
-        "withdrawals": Decimal("0"),
-        "realized_pnl": Decimal("0"),
-        "fees": Decimal("0"),
-        "funding": Decimal("0"),
-        "interest_dividend": Decimal("0"),
-        "transfers": Decimal("0"),
-        "adjustments": Decimal("0"),
+        "deposits": Decimal(0),
+        "withdrawals": Decimal(0),
+        "realized_pnl": Decimal(0),
+        "fees": Decimal(0),
+        "funding": Decimal(0),
+        "interest_dividend": Decimal(0),
+        "transfers": Decimal(0),
+        "adjustments": Decimal(0),
     }
 
     for r in rows:
@@ -155,7 +155,7 @@ def compute_waterfall(
         elif r.type == "adjustment":
             buckets["adjustments"] += s
 
-    ending = starting_balance + sum(buckets.values(), Decimal("0"))
+    ending = starting_balance + sum(buckets.values(), Decimal(0))
     return {
         "starting_balance": starting_balance.quantize(Decimal("0.01")),
         **{k: v.quantize(Decimal("0.01")) for k, v in buckets.items()},
@@ -166,7 +166,7 @@ def compute_waterfall(
 
 def monthly_in_out(db: Session) -> list[dict[str, Any]]:
     rows = db.query(LedgerEntry).order_by(LedgerEntry.ts.asc()).all()
-    by_m: dict[str, dict[str, float]] = {}
+    by_m: dict[str, dict[str, Any]] = {}
     for r in rows:
         m = r.ts.strftime("%Y-%m")
         by_m.setdefault(m, {"month": m, "in": 0.0, "out": 0.0})

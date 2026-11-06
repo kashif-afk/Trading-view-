@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -18,11 +18,11 @@ class RawWebhookLogger:
         self.retention_days = retention_days
 
     def _today_file(self, now: datetime | None = None) -> Path:
-        dt = now or datetime.now(timezone.utc)
+        dt = now or datetime.now(UTC)
         return self.raw_dir / f"webhooks-{dt.strftime('%Y-%m-%d')}.jsonl"
 
     def append(self, raw_bytes: bytes, client_ip: str, content_type: str, now: datetime | None = None) -> Path:
-        dt = now or datetime.now(timezone.utc)
+        dt = now or datetime.now(UTC)
         path = self._today_file(dt)
         raw_text = raw_bytes.decode("utf-8", errors="replace")
         record: dict[str, Any] = {
@@ -40,7 +40,7 @@ class RawWebhookLogger:
         return path
 
     def prune_old(self, now: datetime | None = None) -> int:
-        dt = now or datetime.now(timezone.utc)
+        dt = now or datetime.now(UTC)
         cutoff = (dt - timedelta(days=self.retention_days)).date()
         removed = 0
         for p in self.raw_dir.glob("webhooks-*.jsonl"):

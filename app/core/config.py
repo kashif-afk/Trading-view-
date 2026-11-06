@@ -8,7 +8,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LIVE_CONFIRM_PHRASE = "I UNDERSTAND THIS WILL TRADE REAL MONEY"
@@ -49,11 +49,11 @@ class Settings(BaseSettings):
     # --- account / risk (mirrors position-sizer, pre-trade-discipline-gate, drawdown-circuit-breaker,
     #     exposure-coach) -----------------------------------------------------------
     base_currency: str = "USD"
-    account_size: Decimal = Decimal("2000")
+    account_size: Decimal = Decimal(2000)
     risk_per_trade_pct: Decimal = Decimal("0.5")
     max_daily_loss_pct: Decimal = Decimal("2.0")
     max_open_positions: int = 3
-    max_exposure_pct: Decimal = Decimal("300")  # total notional / equity ceiling (leveraged CFD)
+    max_exposure_pct: Decimal = Decimal(300)  # total notional / equity ceiling (leveraged CFD)
     revenge_block_min: int = 30
     max_entries_per_day: int = 6
     session_start_utc: str = "07:00"

@@ -14,7 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.brokers.oanda import get_broker
 from app.core.config import LIVE_CONFIRM_PHRASE, get_settings
@@ -100,7 +100,7 @@ def main(argv: list[str] | None = None) -> int:
                 {
                     "confirmed_phrase": typed,
                     "risk_hash": s.risk_hash(),
-                    "confirmed_at": datetime.now(timezone.utc).isoformat(),
+                    "confirmed_at": datetime.now(UTC).isoformat(),
                 },
                 indent=2,
             )

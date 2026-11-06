@@ -4,7 +4,7 @@ and JSON float-array fallback on SQLite so unit/chaos tests run identically)."""
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -24,7 +24,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def new_uuid() -> str:
@@ -119,9 +119,9 @@ class FillRecord(Base):
     side: Mapped[str] = mapped_column(String(16))
     qty: Mapped[Decimal] = mapped_column(Numeric(18, 6))
     price: Mapped[Decimal] = mapped_column(Numeric(18, 6))
-    slippage: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
-    fee: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
-    realized_pnl: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    slippage: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal(0))
+    fee: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal(0))
+    realized_pnl: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal(0))
     filled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -141,8 +141,8 @@ class PositionRecord(Base):
     state: Mapped[str] = mapped_column(String(16), index=True, default="open")  # open | closed
     exit_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
     exit_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    realized_pnl: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
-    fees_paid: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    realized_pnl: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal(0))
+    fees_paid: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal(0))
     high_watermark: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
     low_watermark: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
     opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -187,10 +187,10 @@ class TradeJournal(Base):
     qty: Mapped[Decimal] = mapped_column(Numeric(18, 6))
     realized_pnl: Mapped[Decimal] = mapped_column(Numeric(18, 6))
     r_multiple: Mapped[Decimal] = mapped_column(Numeric(10, 4))
-    mae_usd: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
-    mfe_usd: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
-    slippage_usd: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
-    fees_usd: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    mae_usd: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal(0))
+    mfe_usd: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal(0))
+    slippage_usd: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal(0))
+    fees_usd: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal(0))
     holding_seconds: Mapped[int] = mapped_column(Integer, default=0)
     exit_reason: Mapped[str] = mapped_column(String(64))
     signal_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)

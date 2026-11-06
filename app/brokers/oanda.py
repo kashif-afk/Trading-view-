@@ -7,12 +7,17 @@ Enforces:
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
 import httpx
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from app.brokers.base import (
     BrokerAdapter,
@@ -98,7 +103,7 @@ class OandaBroker(BrokerAdapter):
                 status="filled",
                 stop=None,
                 target=None,
-                filled_at=datetime.now(timezone.utc),
+                filled_at=datetime.now(UTC),
                 broker_fill_id=str(tx.get("id", f"OANDA-{client_order_id}")),
             )
 
@@ -128,11 +133,11 @@ class OandaBroker(BrokerAdapter):
             fill_price=px,
             slippage=abs(px - price_hint) * qty,
             fee=fee,
-            realized_pnl=Decimal("0"),
+            realized_pnl=Decimal(0),
             status="filled",
             stop=stop,
             target=target,
-            filled_at=datetime.now(timezone.utc),
+            filled_at=datetime.now(UTC),
             broker_fill_id=str(fill.get("id", f"OANDA-FILL-{client_order_id}")),
         )
 
@@ -152,7 +157,7 @@ class OandaBroker(BrokerAdapter):
         out: list[BrokerOrderResult] = []
         for p in self.positions():
             side = "close_long" if p.direction == "long" else "close_short"
-            cid = f"kill-{p.symbol}-{int(datetime.now(timezone.utc).timestamp() * 1000)}"
+            cid = f"kill-{p.symbol}-{int(datetime.now(UTC).timestamp() * 1000)}"
             out.append(
                 self.place_order(
                     client_order_id=cid,
@@ -219,14 +224,14 @@ class OandaBroker(BrokerAdapter):
                 p = prices[0]
                 bid = Decimal(str(p["bids"][0]["price"]))
                 ask = Decimal(str(p["asks"][0]["price"]))
-                mid = ((bid + ask) / Decimal("2")).quantize(Decimal("0.0001"))
-                return Quote(symbol=symbol, price=mid, ts=datetime.now(timezone.utc), source="oanda", stale=False)
+                mid = ((bid + ask) / Decimal(2)).quantize(Decimal("0.0001"))
+                return Quote(symbol=symbol, price=mid, ts=datetime.now(UTC), source="oanda", stale=False)
         except Exception:
             pass
         return Quote(
             symbol=symbol,
             price=fallback_price or Decimal("4060.00"),
-            ts=datetime.now(timezone.utc),
+            ts=datetime.now(UTC),
             source="fallback",
             stale=True,
         )

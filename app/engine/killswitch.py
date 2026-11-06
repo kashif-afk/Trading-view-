@@ -7,7 +7,7 @@ Works even when PostgreSQL, the LLM, or the dashboard is down:
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -18,7 +18,7 @@ from app.core.state import KillSwitch
 from app.ledger.service import record_entry
 from app.notify.telegram import get_notifier
 from app.storage.db import db_healthy, session_scope
-from app.storage.models import FillRecord, OrderRecord, PositionRecord
+from app.storage.models import OrderRecord, PositionRecord
 
 
 def trigger_kill_switch(
@@ -48,7 +48,7 @@ def trigger_kill_switch(
                 for p in db.query(PositionRecord).filter_by(state="open").all():
                     match = next((r for r in flattened if r.symbol == p.symbol), None)
                     p.state = "closed"
-                    p.closed_at = datetime.now(timezone.utc)
+                    p.closed_at = datetime.now(UTC)
                     p.exit_reason = "kill_switch"
                     if match:
                         p.exit_price = match.fill_price

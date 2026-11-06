@@ -9,7 +9,7 @@ Mirrors the logic of:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -82,7 +82,7 @@ def evaluate_risk_gate(
         )
 
     # 5. Exposure ceiling (`exposure-coach`)
-    max_notional = equity * (s.max_exposure_pct / Decimal("100"))
+    max_notional = equity * (s.max_exposure_pct / Decimal(100))
     if current_open_notional >= max_notional:
         return RiskDecision(
             False,
@@ -91,7 +91,7 @@ def evaluate_risk_gate(
         )
 
     # 6. Trading hours / session filter (UTC)
-    ts_utc = signal_time.astimezone(timezone.utc) if signal_time.tzinfo else signal_time.replace(tzinfo=timezone.utc)
+    ts_utc = signal_time.astimezone(UTC) if signal_time.tzinfo else signal_time.replace(tzinfo=UTC)
     if ts_utc.weekday() >= 5:
         return RiskDecision(False, "rejected: weekend market closed", {})
     mins = ts_utc.hour * 60 + ts_utc.minute
@@ -137,7 +137,7 @@ def evaluate_risk_gate(
         )
         for p in recent_stops:
             if p.closed_at:
-                ca = p.closed_at if p.closed_at.tzinfo else p.closed_at.replace(tzinfo=timezone.utc)
+                ca = p.closed_at if p.closed_at.tzinfo else p.closed_at.replace(tzinfo=UTC)
                 if ca >= cutoff:
                     return RiskDecision(
                         False,

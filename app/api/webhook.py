@@ -64,7 +64,10 @@ async def receive_webhook(request: Request) -> dict[str, Any]:
     try:
         payload = WebhookPayload.model_validate(raw_obj)
     except ValidationError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.errors()) from e
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=e.errors(include_context=False),
+        ) from e
 
     # 6. Freshness check (reject stale > 60s)
     fresh_err = freshness_error(payload.time, s.freshness_sec, s.future_skew_sec)

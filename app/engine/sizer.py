@@ -33,16 +33,16 @@ def calculate_position_size(
     size_multiplier: Decimal = Decimal("1.0"),
 ) -> SizeResult:
     if stop_price is None:
-        return SizeResult(False, Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0"), "rejected: missing stop-loss (no naked entries)")
+        return SizeResult(False, Decimal(0), Decimal(0), Decimal(0), Decimal(0), "rejected: missing stop-loss (no naked entries)")
     stop_dist = abs(Decimal(str(entry_price)) - Decimal(str(stop_price)))
-    if stop_dist <= Decimal("0"):
-        return SizeResult(False, Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0"), "rejected: stop distance must be > 0")
+    if stop_dist <= Decimal(0):
+        return SizeResult(False, Decimal(0), Decimal(0), Decimal(0), Decimal(0), "rejected: stop distance must be > 0")
 
-    risk_budget = (Decimal(str(equity)) * (Decimal(str(risk_pct)) / Decimal("100")) * Decimal(str(size_multiplier)))
+    risk_budget = (Decimal(str(equity)) * (Decimal(str(risk_pct)) / Decimal(100)) * Decimal(str(size_multiplier)))
     raw_qty = risk_budget / stop_dist
 
     if max_additional_notional is not None and entry_price > 0:
-        max_qty_by_exp = max(Decimal("0"), Decimal(str(max_additional_notional)) / Decimal(str(entry_price)))
+        max_qty_by_exp = max(Decimal(0), Decimal(str(max_additional_notional)) / Decimal(str(entry_price)))
         raw_qty = min(raw_qty, max_qty_by_exp)
 
     step = Decimal(str(qty_step))
@@ -52,10 +52,10 @@ def calculate_position_size(
     if stepped_qty < Decimal(str(min_qty)):
         return SizeResult(
             False,
-            Decimal("0"),
-            Decimal("0"),
+            Decimal(0),
+            Decimal(0),
             stop_dist,
-            Decimal("0"),
+            Decimal(0),
             f"rejected: sized qty {stepped_qty} < min_qty {min_qty} for risk budget ${risk_budget:.2f}",
         )
 
@@ -63,8 +63,8 @@ def calculate_position_size(
     if notional < Decimal(str(min_notional)):
         return SizeResult(
             False,
-            Decimal("0"),
-            Decimal("0"),
+            Decimal(0),
+            Decimal(0),
             stop_dist,
             notional,
             f"rejected: notional ${notional} < min_notional ${min_notional}",

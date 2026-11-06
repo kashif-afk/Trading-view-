@@ -7,7 +7,7 @@ import logging
 import re
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def secret_ok(provided: str | None, expected: str) -> bool:
@@ -20,11 +20,11 @@ def parse_ts(value: str) -> datetime:
     v = value.strip()
     if v.isdigit():  # epoch ms or s
         n = int(v)
-        return datetime.fromtimestamp(n / 1000 if n > 10**11 else n, tz=timezone.utc)
+        return datetime.fromtimestamp(n / 1000 if n > 10**11 else n, tz=UTC)
     if v.endswith("Z"):
         v = v[:-1] + "+00:00"
     dt = datetime.fromisoformat(v)
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 def freshness_error(ts: str, max_age_sec: int, future_skew_sec: int, now: datetime | None = None) -> str | None:
@@ -32,7 +32,7 @@ def freshness_error(ts: str, max_age_sec: int, future_skew_sec: int, now: dateti
         sent = parse_ts(ts)
     except (ValueError, OverflowError):
         return "invalid time"
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     age = (now - sent).total_seconds()
     if age > max_age_sec:
         return f"stale: {age:.0f}s old > {max_age_sec}s"
@@ -67,7 +67,7 @@ class RateLimiter:
         return True
 
 
-_SECRET_RE = re.compile(r'("?(secret|api_key|token|password)"?\s*[:=]\s*"?)([^",\s}]+)', re.I)
+_SECRET_RE = re.compile(r'("?(secret|api_key|token|password)"?\s*[:=]\s*"?)([^",\s}]+)', re.IGNORECASE)
 
 
 def redact(text: str) -> str:

@@ -40,10 +40,30 @@ def replay_outbox(
     replayed = 0
     for item in outbox.pending_signals():
         raw = dict(item["payload"])
+        outbox_mode = raw.pop("_outbox_mode", None)
         raw["secret"] = s.webhook_secret.get_secret_value() or "REPLAY"
         wp = WebhookPayload(**raw)
         with session_scope(s) as db:
             already = db.query(SignalRecord).filter_by(signal_id=wp.signal_id).one_or_none()
+            if already is None and outbox_mode == "entry_blocked_db_down":
+                db.add(
+                    SignalRecord(
+                        signal_id=wp.signal_id,
+                        strategy=wp.strategy,
+                        symbol=wp.symbol,
+                        broker_symbol=s.broker_symbol(wp.symbol),
+                        action=wp.action,
+                        price=wp.price,
+                        stop=wp.stop,
+                        target=wp.target,
+                        timeframe=wp.timeframe,
+                        signal_time=wp.time,
+                        payload={**raw, "secret": "***"},
+                        status="rejected",
+                        reason="rejected: arrived while primary DB was down (entries blocked)",
+                    )
+                )
+                already = True  # type: ignore[assignment]
         if already is None:
             process_webhook_signal(wp, settings=s, broker=brk, embedder=emb)
         outbox.mark_signal_replayed(item["id"])

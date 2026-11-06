@@ -11,12 +11,10 @@ from __future__ import annotations
 
 import gzip
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
-
-from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.ledger.service import compute_waterfall
@@ -48,7 +46,7 @@ def _row_to_dict(obj: Any) -> dict[str, Any]:
 def create_backup(settings: Settings, backup_dir: Path) -> Path:
     backup_dir = Path(backup_dir)
     backup_dir.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     out_path = backup_dir / f"backup-{ts}.json.gz"
 
     with session_scope(settings) as db:

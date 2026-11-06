@@ -38,7 +38,7 @@ from app.memory.digest import (
     compute_performance_metrics,
     generate_weekly_learning_digest,
 )
-from app.storage.db import db_healthy, session_scope
+from app.storage.db import session_scope
 from app.storage.models import (
     LedgerEntry,
     LessonRecord,
@@ -46,7 +46,6 @@ from app.storage.models import (
     PositionRecord,
     RuleChangeProposal,
     SignalRecord,
-    TradeJournal,
 )
 
 router = APIRouter()
@@ -115,11 +114,11 @@ def overview_page(request: Request, user: str = Depends(require_user)) -> Respon
         ensure_initial_deposit(db, s.account_size, s.base_currency)
         wf = compute_waterfall(db)
         open_pos = db.query(PositionRecord).filter_by(state="open").all()
-        open_risk = sum((Decimal(str(p.initial_risk_usd)) for p in open_pos), Decimal("0"))
+        open_risk = sum((Decimal(str(p.initial_risk_usd)) for p in open_pos), Decimal(0))
         ledger_rows = db.query(LedgerEntry).order_by(LedgerEntry.ts.asc()).all()
 
     eq_points: list[dict[str, Any]] = []
-    running = Decimal("0")
+    running = Decimal(0)
     for r in ledger_rows:
         running += Decimal(str(r.amount)) if r.direction == "in" else -Decimal(str(r.amount))
         eq_points.append({"ts": r.ts.strftime("%Y-%m-%d %H:%M"), "balance": float(running)})

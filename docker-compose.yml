@@ -1,0 +1,71 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-trader}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-traderpass}
+      POSTGRES_DB: ${POSTGRES_DB:-trading}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trader} -d ${POSTGRES_DB:-trading}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://trader:traderpass@db:5432/trading}
+      DATA_DIR: /app/data
+    ports:
+      - "8000:8000"
+    volumes:
+      - appdata:/app/data
+      - applogs:/app/logs
+      - appbackups:/app/backups
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  worker:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://trader:traderpass@db:5432/trading}
+      DATA_DIR: /app/data
+    volumes:
+      - appdata:/app/data
+      - applogs:/app/logs
+      - appbackups:/app/backups
+    command: >
+      python -c "import time;
+      from app.core.config import get_settings;
+      from app.engine.reconciler import reconcile_state;
+      from app.storage.db import init_db;
+      s = get_settings(); init_db(s);
+      print('Worker started: running reconciler & outbox replay every', s.reconcile_interval_sec, 's');
+      while True:
+          try: reconcile_state(s)
+          except Exception as e: print('reconcile error:', e)
+          time.sleep(s.reconcile_interval_sec)"
+
+volumes:
+  pgdata:
+  appdata:
+  applogs:
+  appbackups:

@@ -76,9 +76,7 @@ def classify_trade(
         if not tags:
             tags.append("good_trade_bad_outcome")
     else:
-        if r >= 0.8 and not tags:
-            tags.append("clean_win")
-        elif not tags:
+        if r >= 0.8 and not tags or not tags:
             tags.append("clean_win")
 
     outcome = "WIN" if r > 0.05 else ("LOSS" if r < -0.05 else "SCRATCH")

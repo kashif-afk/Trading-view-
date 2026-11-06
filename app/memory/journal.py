@@ -2,7 +2,7 @@
 Builds on `trader-memory-core` and `signal-postmortem`."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -41,7 +41,7 @@ def record_closed_trade_journal(
     *,
     pos: PositionRecord,
     signal: SignalRecord | None,
-    slippage_usd: Decimal = Decimal("0"),
+    slippage_usd: Decimal = Decimal(0),
     nearby_events: list[dict[str, Any]] | None = None,
     entries_today: int = 1,
     settings: Settings | None = None,
@@ -59,14 +59,14 @@ def record_closed_trade_journal(
     ind = payload.get("indicators") or {}
     regime_bucket = regime_bucket_from_indicators(ind)
     timeframe = signal.timeframe if signal else "15m"
-    risk_usd = Decimal(str(pos.initial_risk_usd)) if pos.initial_risk_usd and pos.initial_risk_usd > 0 else Decimal("10")
+    risk_usd = Decimal(str(pos.initial_risk_usd)) if pos.initial_risk_usd and pos.initial_risk_usd > 0 else Decimal(10)
     net_pnl = Decimal(str(pos.realized_pnl)) - Decimal(str(pos.fees_paid))
     r_mult = (net_pnl / risk_usd).quantize(Decimal("0.0001"))
 
-    opened = pos.opened_at if pos.opened_at.tzinfo else pos.opened_at.replace(tzinfo=timezone.utc)
-    closed = (pos.closed_at or datetime.now(timezone.utc))
+    opened = pos.opened_at if pos.opened_at.tzinfo else pos.opened_at.replace(tzinfo=UTC)
+    closed = (pos.closed_at or datetime.now(UTC))
     if not closed.tzinfo:
-        closed = closed.replace(tzinfo=timezone.utc)
+        closed = closed.replace(tzinfo=UTC)
     hold_sec = max(0, int((closed - opened).total_seconds()))
 
     entry_px = Decimal(str(pos.avg_entry_price))
@@ -75,11 +75,11 @@ def record_closed_trade_journal(
     lo = Decimal(str(pos.low_watermark or min(entry_px, exit_px)))
     qty = Decimal(str(pos.qty))
     if pos.direction == "long":
-        mfe_usd = max(Decimal("0"), (hi - entry_px) * qty)
-        mae_usd = max(Decimal("0"), (entry_px - lo) * qty)
+        mfe_usd = max(Decimal(0), (hi - entry_px) * qty)
+        mae_usd = max(Decimal(0), (entry_px - lo) * qty)
     else:
-        mfe_usd = max(Decimal("0"), (entry_px - lo) * qty)
-        mae_usd = max(Decimal("0"), (hi - entry_px) * qty)
+        mfe_usd = max(Decimal(0), (entry_px - lo) * qty)
+        mae_usd = max(Decimal(0), (hi - entry_px) * qty)
 
     tags, lesson_text = classify_trade(
         direction=pos.direction,

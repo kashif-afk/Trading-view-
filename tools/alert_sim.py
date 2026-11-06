@@ -6,8 +6,7 @@ sizer -> broker -> ledger -> dashboard flow without a paid TradingView webhook p
 from __future__ import annotations
 
 import argparse
-import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -32,7 +31,7 @@ def build_payload(
     rsi: float = 54.2,
     atr: float = 8.0,
 ) -> dict[str, Any]:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     iso = ts_iso or now.strftime("%Y-%m-%dT%H:%M:%SZ")
     sig_id = signal_id or f"{symbol}-{int(now.timestamp() * 1000)}-{action}"
     return {

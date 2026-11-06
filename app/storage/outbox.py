@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -58,7 +58,7 @@ class OutboxStore:
 
     def enqueue_signal(self, signal_id: str, payload: dict[str, Any]) -> bool:
         """Returns True if inserted, False if duplicate signal_id already in outbox."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         with self._conn() as c:
             cur = c.execute(
                 """
@@ -85,7 +85,7 @@ class OutboxStore:
             ]
 
     def mark_signal_replayed(self, row_id: int) -> None:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         with self._conn() as c:
             c.execute(
                 "UPDATE signal_outbox SET status='replayed', replayed_at=? WHERE id=?",
@@ -99,7 +99,7 @@ class OutboxStore:
 
     # --- Embedding fallback queue ---
     def enqueue_embedding(self, journal_id: str, text_to_embed: str, metadata: dict[str, Any]) -> bool:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         with self._conn() as c:
             cur = c.execute(
                 """
@@ -126,7 +126,7 @@ class OutboxStore:
             ]
 
     def mark_embedding_done(self, row_id: int) -> None:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         with self._conn() as c:
             c.execute(
                 "UPDATE embedding_outbox SET status='done', completed_at=? WHERE id=?",
