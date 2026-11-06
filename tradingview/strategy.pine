@@ -1,0 +1,211 @@
+//@version=6
+// Strategy: XAUUSD EMA-RSI-ATR v0.1 (non-repainting, confirmed bar close only)
+// IMPORTANT: Keep this script PRIVATE. The webhook secret is stored in script inputs;
+// sharing a chart or publishing this script with a live secret exposes your webhook.
+strategy(
+     title               = "XAUUSD EMA-RSI-ATR v0.1",
+     shorttitle          = "XAU_EMA_RSI_v0.1",
+     overlay             = true,
+     calc_on_every_tick  = false,
+     process_orders_on_close = false,
+     pyramiding          = 0,
+     initial_capital     = 2000,
+     currency            = currency.USD,
+     default_qty_type    = strategy.fixed,
+     default_qty_value   = 0.1,
+     commission_type     = strategy.commission.cash_per_contract,
+     commission_value    = 0.05,
+     slippage            = 10)
+
+// ── Inputs: Strategy Parameters ──────────────────────────────────────────────
+grp_ind   = "Indicators"
+emaFastLen = input.int(20,   "Fast EMA Length", minval=2, group=grp_ind)
+emaSlowLen = input.int(50,   "Slow EMA Length", minval=5, group=grp_ind)
+rsiLen     = input.int(14,   "RSI Length",      minval=2, group=grp_ind)
+rsiMid     = input.float(50, "RSI Midline",     minval=30, maxval=70, group=grp_ind)
+rsiOb      = input.float(70, "RSI Overbought",  minval=55, maxval=95, group=grp_ind)
+rsiOs      = input.float(30, "RSI Oversold",    minval=5,  maxval=45, group=grp_ind)
+atrLen     = input.int(14,   "ATR Length",      minval=2, group=grp_ind)
+
+grp_risk  = "Risk & Exits"
+atrMult    = input.float(1.5, "Stop ATR Multiplier", minval=0.2, step=0.1, group=grp_risk)
+rrRatio    = input.float(2.0, "Reward : Risk Ratio", minval=0.5, step=0.1, group=grp_risk)
+maxBars    = input.int(48,    "Max Bars In Trade",   minval=4, group=grp_risk)
+riskPct    = input.float(0.5, "Risk % per Trade (Tester Sizing)", minval=0.1, maxval=5.0, step=0.1, group=grp_risk)
+minLot     = input.float(0.01,"Broker Min Qty (oz)", minval=0.01, step=0.01, group=grp_risk)
+lotStep    = input.float(0.01,"Broker Lot Step (oz)", minval=0.01, step=0.01, group=grp_risk)
+enableLong = input.bool(true, "Enable Long Entries", group=grp_risk)
+enableShort= input.bool(true, "Enable Short Entries", group=grp_risk)
+
+grp_flt   = "Regime & Session Filters"
+useSession = input.bool(true, "Use Session Filter (UTC)", group=grp_flt)
+sessStr    = input.session("0700-2000", "Active Session (UTC)", group=grp_flt)
+friCutoffH = input.int(18,    "Friday No-Entry Hour (UTC)", minval=0, maxval=23, group=grp_flt)
+friFlatH   = input.int(20,    "Friday Flatten Hour (UTC)",  minval=0, maxval=23, group=grp_flt)
+friFlatM   = input.int(45,    "Friday Flatten Minute (UTC)",minval=0, maxval=59, group=grp_flt)
+useHtf     = input.bool(true, "Use HTF EMA Regime Filter (F2)", group=grp_flt)
+htfTf      = input.timeframe("240", "HTF Timeframe", group=grp_flt)
+htfEmaLen  = input.int(200,   "HTF EMA Length", minval=20, group=grp_flt)
+
+grp_wh    = "Webhook & Audit"
+stratName  = input.string("XAU_EMA_RSI_v0.1", "Strategy Name Tag", group=grp_wh)
+whSecret   = input.string("CHANGE_ME", "Webhook Secret", group=grp_wh, display=display.none)
+
+// ── Indicators ───────────────────────────────────────────────────────────────
+emaFast = ta.ema(close, emaFastLen)
+emaSlow = ta.ema(close, emaSlowLen)
+rsiVal  = ta.rsi(close, rsiLen)
+atrVal  = ta.atr(atrLen)
+
+// Non-repainting HTF filter: reads previous completed HTF bar [1] with lookahead_off
+[htfClose, htfEma] = request.security(
+     syminfo.tickerid,
+     htfTf,
+     [close[1], ta.ema(close, htfEmaLen)[1]],
+     gaps      = barmerge.gaps_off,
+     lookahead = barmerge.lookahead_off)
+
+int htfBias = na(htfClose) or na(htfEma) ? 0 : (htfClose > htfEma ? 1 : -1)
+
+// ── Session & Time Checks (UTC) ──────────────────────────────────────────────
+inSess     = not useSession or not na(time(timeframe.period, sessStr, "UTC"))
+utcDow     = dayofweek(time, "UTC")
+utcHour    = hour(time_close, "UTC")
+utcMin     = minute(time_close, "UTC")
+isFriLate  = (utcDow == dayofweek.friday) and (utcHour >= friCutoffH)
+isFriFlat  = (utcDow == dayofweek.friday) and (utcHour > friFlatH or (utcHour == friFlatH and utcMin >= friFlatM))
+canEnter   = inSess and not isFriLate and not isFriFlat
+
+// ── Signal Conditions (confirmed bar close only) ─────────────────────────────
+confirmed  = barstate.isconfirmed
+htfLongOk  = not useHtf or htfBias == 1
+htfShortOk = not useHtf or htfBias == -1
+
+rsiCrossUp = ta.crossover(rsiVal, rsiMid)
+rsiCrossDn = ta.crossunder(rsiVal, rsiMid)
+
+longSig  = confirmed and enableLong  and canEnter and htfLongOk  and emaFast > emaSlow and close > emaSlow and rsiCrossUp and rsiVal < rsiOb
+shortSig = confirmed and enableShort and canEnter and htfShortOk and emaFast < emaSlow and close < emaSlow and rsiCrossDn and rsiVal > rsiOs
+
+// ── Position State Tracking ──────────────────────────────────────────────────
+var float activeStop   = na
+var float activeTarget = na
+var int   entryBarIdx  = na
+var int   prevClosed   = 0
+
+inLong  = strategy.position_size > 0
+inShort = strategy.position_size < 0
+isFlat  = strategy.position_size == 0
+
+// ── JSON Alert Builder ───────────────────────────────────────────────────────
+f_num(float v) =>
+    na(v) ? "null" : str.tostring(math.round(v, 4))
+
+f_alert_json(string action, float px, float sl, float tp, string reason) =>
+    string sigId = syminfo.ticker + "-" + str.tostring(time_close) + "-" + action
+    string isoTs = str.format_time(timenow, "yyyy-MM-dd'T'HH:mm:ss'Z'", "UTC")
+    string indJson = '{"ema_fast":' + f_num(emaFast) + ',"ema_slow":' + f_num(emaSlow) + ',"rsi":' + f_num(rsiVal) + ',"atr":' + f_num(atrVal) + ',"htf_bias":' + str.tostring(htfBias) + '}'
+    '{"secret":"' + whSecret + '","signal_id":"' + sigId + '","strategy":"' + stratName + '","symbol":"' + syminfo.ticker + '","exchange":"' + syminfo.prefix + '","action":"' + action + '","price":' + f_num(px) + ',"stop":' + f_num(sl) + ',"target":' + f_num(tp) + ',"timeframe":"' + timeframe.period + '","time":"' + isoTs + '","reason":"' + reason + '","indicators":' + indJson + '}'
+
+// ── Detect Broker Bracket Exits (Stop / Target hit on bar) ───────────────────
+if confirmed and isFlat and strategy.closedtrades > prevClosed
+    int lastIdx = strategy.closedtrades - 1
+    string exitComment = strategy.closedtrades.exit_comment(lastIdx)
+    float lastQty = strategy.closedtrades.size(lastIdx)
+    string closeAct = lastQty > 0 ? "close_long" : "close_short"
+    if exitComment == "SL/TP"
+        float exitPx = strategy.closedtrades.exit_price(lastIdx)
+        float entryPx = strategy.closedtrades.entry_price(lastIdx)
+        bool wasWin = (lastQty > 0 and exitPx > entryPx) or (lastQty < 0 and exitPx < entryPx)
+        alert(f_alert_json(closeAct, exitPx, na, na, wasWin ? "target" : "stop"), alert.freq_once_per_bar_close)
+    activeStop   := na
+    activeTarget := na
+    entryBarIdx  := na
+    prevClosed   := strategy.closedtrades
+
+// ── Manage Open Positions (Trend Flip, Time Stop, Weekend Flatten) ───────────
+int barsHeld = not na(entryBarIdx) ? (bar_index - entryBarIdx) : 0
+trendFlipExit = (inLong and emaFast < emaSlow) or (inShort and emaFast > emaSlow)
+timeStopExit  = (inLong or inShort) and barsHeld >= maxBars
+
+if confirmed and (inLong or inShort)
+    string closeAct = inLong ? "close_long" : "close_short"
+    string rsn = isFriFlat ? "weekend" : (trendFlipExit ? "trend_flip" : (timeStopExit ? "time" : ""))
+    if rsn != ""
+        strategy.close_all(comment=rsn)
+        alert(f_alert_json(closeAct, close, na, na, rsn), alert.freq_once_per_bar_close)
+        activeStop   := na
+        activeTarget := na
+        entryBarIdx  := na
+        prevClosed   := strategy.closedtrades
+
+// ── New Entries (only when flat) ─────────────────────────────────────────────
+f_calc_qty(float stopDist) =>
+    float riskUsd = strategy.equity * (riskPct / 100.0)
+    float rawQty  = stopDist > 0 ? (riskUsd / stopDist) : 0.0
+    float stepped = math.floor(rawQty / lotStep) * lotStep
+    stepped >= minLot ? stepped : 0.0
+
+if confirmed and isFlat and not na(atrVal)
+    float stopDist = atrMult * atrVal
+    float qty      = f_calc_qty(stopDist)
+    if longSig and qty >= minLot
+        float sl = close - stopDist
+        float tp = close + rrRatio * stopDist
+        activeStop   := sl
+        activeTarget := tp
+        entryBarIdx  := bar_index
+        strategy.entry("Long", strategy.long, qty=qty, comment="entry_long")
+        strategy.exit("Long_Exit", from_entry="Long", stop=sl, limit=tp, comment="SL/TP")
+        alert(f_alert_json("buy", close, sl, tp, "entry"), alert.freq_once_per_bar_close)
+    else if shortSig and qty >= minLot
+        float sl = close + stopDist
+        float tp = close - rrRatio * stopDist
+        activeStop   := sl
+        activeTarget := tp
+        entryBarIdx  := bar_index
+        strategy.entry("Short", strategy.short, qty=qty, comment="entry_short")
+        strategy.exit("Short_Exit", from_entry="Short", stop=sl, limit=tp, comment="SL/TP")
+        alert(f_alert_json("sell", close, sl, tp, "entry"), alert.freq_once_per_bar_close)
+
+// Keep bracket order alive while in position
+if inLong and not na(activeStop) and not na(activeTarget)
+    strategy.exit("Long_Exit", from_entry="Long", stop=activeStop, limit=activeTarget, comment="SL/TP")
+if inShort and not na(activeStop) and not na(activeTarget)
+    strategy.exit("Short_Exit", from_entry="Short", stop=activeStop, limit=activeTarget, comment="SL/TP")
+
+// ── Plots & On-Chart Stats Table ─────────────────────────────────────────────
+plot(emaFast, "EMA Fast", color=color.new(color.aqua, 0), linewidth=2)
+plot(emaSlow, "EMA Slow", color=color.new(color.orange, 0), linewidth=2)
+plot(not isFlat ? activeStop   : na, "Active Stop",   color=color.red,   style=plot.style_linebr, linewidth=2)
+plot(not isFlat ? activeTarget : na, "Active Target", color=color.green, style=plot.style_linebr, linewidth=2)
+
+plotshape(longSig  and isFlat, title="Long Signal",  style=shape.triangleup,   location=location.belowbar, color=color.lime, size=size.small, text="BUY")
+plotshape(shortSig and isFlat, title="Short Signal", style=shape.triangledown, location=location.abovebar, color=color.red,  size=size.small, text="SELL")
+
+var table statsTbl = table.new(position.top_right, 2, 8, bgcolor=color.new(color.black, 20), border_width=1)
+if barstate.islast
+    int totTrades = strategy.closedtrades
+    int wins      = strategy.wintrades
+    float winRate = totTrades > 0 ? (wins * 100.0 / totTrades) : 0.0
+    float pf      = strategy.grossloss != 0 ? math.abs(strategy.grossprofit / strategy.grossloss) : 0.0
+    float avgTr   = totTrades > 0 ? (strategy.netprofit / totTrades) : 0.0
+    string posTxt = inLong ? "LONG" : (inShort ? "SHORT" : "FLAT")
+    string biasTxt= htfBias == 1 ? "BULL" : (htfBias == -1 ? "BEAR" : "N/A")
+
+    table.cell(statsTbl, 0, 0, "Strategy",    text_color=color.gray,  text_size=size.small)
+    table.cell(statsTbl, 1, 0, stratName,     text_color=color.white, text_size=size.small)
+    table.cell(statsTbl, 0, 1, "Net Profit",  text_color=color.gray,  text_size=size.small)
+    table.cell(statsTbl, 1, 1, "$" + str.tostring(math.round(strategy.netprofit, 2)), text_color=strategy.netprofit >= 0 ? color.lime : color.red, text_size=size.small)
+    table.cell(statsTbl, 0, 2, "Trades / WR", text_color=color.gray,  text_size=size.small)
+    table.cell(statsTbl, 1, 2, str.tostring(totTrades) + " (" + str.tostring(math.round(winRate, 1)) + "%)", text_color=color.white, text_size=size.small)
+    table.cell(statsTbl, 0, 3, "Profit Factor",text_color=color.gray, text_size=size.small)
+    table.cell(statsTbl, 1, 3, str.tostring(math.round(pf, 2)),       text_color=color.white, text_size=size.small)
+    table.cell(statsTbl, 0, 4, "Avg Trade",   text_color=color.gray,  text_size=size.small)
+    table.cell(statsTbl, 1, 4, "$" + str.tostring(math.round(avgTr, 2)), text_color=color.white, text_size=size.small)
+    table.cell(statsTbl, 0, 5, "Max Drawdown",text_color=color.gray,  text_size=size.small)
+    table.cell(statsTbl, 1, 5, "$" + str.tostring(math.round(strategy.max_drawdown, 2)), text_color=color.orange, text_size=size.small)
+    table.cell(statsTbl, 0, 6, "Position",    text_color=color.gray,  text_size=size.small)
+    table.cell(statsTbl, 1, 6, posTxt,        text_color=color.yellow,text_size=size.small)
+    table.cell(statsTbl, 0, 7, "HTF Bias",    text_color=color.gray,  text_size=size.small)
+    table.cell(statsTbl, 1, 7, biasTxt,       text_color=htfBias == 1 ? color.lime : color.red, text_size=size.small)
