@@ -17,7 +17,7 @@ backups/
 research/cache/
 reports/
 
-# third-party skillset (installed separately, MIT, tradermonty/claude-trading-skills)
-.claude/skills/
+# third-party skillset (MIT, tradermonty/claude-trading-skills) is committed under .claude/skills
+# /skills is a local junction to .claude/skills
 /skills
 
