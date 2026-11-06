@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Settings &amp; Manual Cash-Flow Entry</h2>
+
+<div class="card" style="margin-bottom:1.5rem;">
+  <h3>Active Risk &amp; Execution Config (Hash: <code>{{ risk_hash }}</code>)</h3>
+  <p style="color:#94a3b8;font-size:0.85rem;">
+    Switching to <code>live</code> mode is blocked from the UI and requires both editing <code>.env</code> and running
+    <code>python -m cli.tradectl set-live</code> with typed confirmation.
+  </p>
+  <table>
+    <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+    <tbody>
+      {% for k, v in risk_params.items() %}
+      <tr><td><code>{{ k }}</code></td><td>{{ v }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h3>Record Manual Cash-Flow Movement</h3>
+  <form method="post" action="/settings/cashflow" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.75rem;align-items:end;">
+    <div>
+      <label style="display:block;font-size:0.8rem;color:#94a3b8;">Type</label>
+      <select name="entry_type" data-testid="cf-type">
+        <option value="deposit">deposit</option>
+        <option value="withdrawal">withdrawal</option>
+        <option value="funding">funding</option>
+        <option value="interest">interest</option>
+        <option value="dividend">dividend</option>
+        <option value="transfer">transfer</option>
+        <option value="adjustment">adjustment (note required)</option>
+      </select>
+    </div>
+    <div>
+      <label style="display:block;font-size:0.8rem;color:#94a3b8;">Direction</label>
+      <select name="direction" data-testid="cf-direction">
+        <option value="in">in (+)</option>
+        <option value="out">out (-)</option>
+      </select>
+    </div>
+    <div>
+      <label style="display:block;font-size:0.8rem;color:#94a3b8;">Amount (USD)</label>
+      <input type="number" step="0.01" min="0.01" name="amount" required data-testid="cf-amount" />
+    </div>
+    <div>
+      <label style="display:block;font-size:0.8rem;color:#94a3b8;">Reference</label>
+      <input type="text" name="ref" placeholder="bank_wire_01" data-testid="cf-ref" />
+    </div>
+    <div>
+      <label style="display:block;font-size:0.8rem;color:#94a3b8;">Note</label>
+      <input type="text" name="note" placeholder="Required for adjustments" data-testid="cf-note" />
+    </div>
+    <div>
+      <button type="submit" class="btn-success" data-testid="cf-submit">Record Entry</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

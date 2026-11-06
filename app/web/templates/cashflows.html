@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;">
+  <h2>Cash Flows &amp; Double-Entry Ledger</h2>
+  <a class="btn btn-secondary" href="/cashflows/export.csv?ledger_type={{ selected_type }}">Export CSV</a>
+</div>
+
+<div class="grid" data-testid="waterfall-grid">
+  <div class="card"><h3>Starting Balance</h3><div class="val" data-testid="wf-start">${{ "%.2f"|format(waterfall.starting_balance) }}</div></div>
+  <div class="card"><h3>Deposits</h3><div class="val pos" data-testid="wf-deposits">${{ "%+.2f"|format(waterfall.deposits) }}</div></div>
+  <div class="card"><h3>Withdrawals</h3><div class="val neg" data-testid="wf-withdrawals">${{ "%+.2f"|format(waterfall.withdrawals) }}</div></div>
+  <div class="card"><h3>Realized P&amp;L</h3><div class="val" data-testid="wf-pnl">${{ "%+.2f"|format(waterfall.realized_pnl) }}</div></div>
+  <div class="card"><h3>Fees</h3><div class="val neg" data-testid="wf-fees">${{ "%+.2f"|format(waterfall.fees) }}</div></div>
+  <div class="card"><h3>Funding / Interest</h3><div class="val" data-testid="wf-funding">${{ "%+.2f"|format(waterfall.funding + waterfall.interest_dividend) }}</div></div>
+  <div class="card"><h3>Adjustments / Transfers</h3><div class="val" data-testid="wf-adjustments">${{ "%+.2f"|format(waterfall.adjustments + waterfall.transfers) }}</div></div>
+  <div class="card"><h3>Ending Balance</h3><div class="val" data-testid="wf-ending">${{ "%.2f"|format(waterfall.ending_balance) }}</div></div>
+</div>
+
+<div class="card" style="margin-bottom:1.5rem;">
+  <h3>Ledger Entries</h3>
+  <form method="get" action="/cashflows" style="margin-bottom:1rem;display:flex;gap:0.6rem;align-items:center;">
+    <select name="ledger_type">
+      <option value="">All Types</option>
+      {% for t in ['deposit','withdrawal','realized_pnl','fee','funding','interest','dividend','transfer','adjustment'] %}
+        <option value="{{ t }}" {{ 'selected' if selected_type==t else '' }}>{{ t }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn-secondary">Filter</button>
+  </form>
+  <table data-testid="ledger-table">
+    <thead>
+      <tr><th>Timestamp (UTC)</th><th>Type</th><th>Direction</th><th>Amount</th><th>Ref</th><th>Note</th></tr>
+    </thead>
+    <tbody>
+      {% for r in entries %}
+      <tr>
+        <td>{{ r.ts.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        <td>{{ r.type }}</td>
+        <td>{{ r.direction }}</td>
+        <td class="{{ 'pos' if r.direction=='in' else 'neg' }}">${{ "%.2f"|format(r.amount) }}</td>
+        <td>{{ r.ref or '' }}</td>
+        <td>{{ r.note or '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

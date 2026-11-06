@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Trade Lessons &amp; Postmortem Memory (Phase 4.5)</h2>
+
+<div class="card" style="margin-bottom:1.5rem;">
+  <h3>Mistake Taxonomy Counts</h3>
+  <div style="display:flex;gap:0.75rem;flex-wrap:wrap;" data-testid="mistake-counts">
+    {% for tag, count in mistake_counts.items() %}
+      <a class="btn btn-secondary" href="/lessons?tag={{ tag }}">{{ tag }}: {{ count }}</a>
+    {% else %}
+      <span style="color:#94a3b8;">No tagged trades yet.</span>
+    {% endfor %}
+  </div>
+</div>
+
+{% if proposals %}
+<div class="card" style="margin-bottom:1.5rem;">
+  <h3>Rule-Change Proposals (&ge; 30 Trades Evidence Required)</h3>
+  <table>
+    <thead><tr><th>ID</th><th>Target Mistake</th><th>Evidence Trades</th><th>Proposed Spec Diff</th><th>Status</th><th>Action</th></tr></thead>
+    <tbody>
+      {% for p in proposals %}
+      <tr>
+        <td>#{{ p.id }}</td>
+        <td>{{ p.target_mistake_tag }}</td>
+        <td>{{ p.evidence_trade_count }}</td>
+        <td><pre style="margin:0;font-size:0.75rem;">{{ p.proposed_diff }}</pre></td>
+        <td>{{ p.status }}</td>
+        <td>
+          {% if p.status == 'pending_review' %}
+            <form method="post" action="/lessons/proposals/{{ p.id }}/approve">
+              <button type="submit" class="btn-success">Approve Change</button>
+            </form>
+          {% else %}
+            Approved by {{ p.approved_by }}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div class="card">
+  <h3>Searchable Lessons</h3>
+  <form method="get" action="/lessons" style="margin-bottom:1rem;display:flex;gap:0.6rem;">
+    <input type="text" name="q" value="{{ search_q }}" placeholder="Search lessons or setups..." data-testid="lesson-search-input" />
+    <button type="submit" class="btn-secondary">Search</button>
+  </form>
+  <table data-testid="lessons-table">
+    <thead>
+      <tr><th>Time</th><th>Symbol / TF</th><th>Direction</th><th>Regime</th><th>R-Multiple</th><th>Tags</th><th>Lesson</th><th>Model</th></tr>
+    </thead>
+    <tbody>
+      {% for l in lessons %}
+      <tr>
+        <td>{{ l.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td>{{ l.symbol }} ({{ l.timeframe }})</td>
+        <td>{{ l.direction }}</td>
+        <td>{{ l.regime_bucket }}</td>
+        <td class="{{ 'pos' if l.r_multiple > 0 else 'neg' }}">{{ "%+.2f"|format(l.r_multiple) }}R</td>
+        <td>{{ (l.tags or [])|join(', ') }}</td>
+        <td>{{ l.lesson_text }}</td>
+        <td>{{ l.model_version }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" style="color:#94a3b8;">No matching lessons found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

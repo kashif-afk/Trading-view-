@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;">
+  <h2>Performance Analytics</h2>
+  <form method="post" action="/performance/run-digest">
+    <button type="submit" class="btn-secondary" data-testid="run-digest-btn">Run Weekly Learning Digest</button>
+  </form>
+</div>
+
+<div class="grid">
+  <div class="card"><h3>Total Closed Trades</h3><div class="val" data-testid="perf-trades">{{ perf.total_trades }}</div></div>
+  <div class="card"><h3>Win Rate</h3><div class="val">{{ perf.win_rate }}%</div></div>
+  <div class="card"><h3>Expectancy / Avg R</h3><div class="val">{{ perf.avg_r }} R</div></div>
+  <div class="card"><h3>Profit Factor</h3><div class="val">{{ perf.profit_factor }}</div></div>
+  <div class="card"><h3>Max Drawdown (R)</h3><div class="val neg">{{ perf.max_drawdown_r }} R</div></div>
+  <div class="card"><h3>Net Realized P&amp;L</h3><div class="val">${{ "%.2f"|format(perf.net_pnl_usd) }}</div></div>
+</div>
+
+<div class="card" style="margin-bottom:1.5rem;">
+  <h3>Per-Symbol Breakdown</h3>
+  <table>
+    <thead><tr><th>Symbol</th><th>Trades</th><th>Wins</th><th>Total R</th><th>Net P&amp;L ($)</th></tr></thead>
+    <tbody>
+      {% for sym, st in perf.by_symbol.items() %}
+      <tr><td>{{ sym }}</td><td>{{ st.trades }}</td><td>{{ st.wins }}</td><td>{{ st.total_r }} R</td><td>${{ "%.2f"|format(st.net_pnl) }}</td></tr>
+      {% else %}
+      <tr><td colspan="5">No closed trades yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

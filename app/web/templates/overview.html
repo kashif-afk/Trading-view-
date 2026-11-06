@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Overview</h2>
+<div class="grid">
+  <div class="card">
+    <h3>Cash Balance</h3>
+    <div class="val" data-testid="overview-cash">${{ "%.2f"|format(balance.cash_balance) }}</div>
+  </div>
+  <div class="card">
+    <h3>Total Equity</h3>
+    <div class="val" data-testid="overview-equity">${{ "%.2f"|format(balance.equity) }}</div>
+  </div>
+  <div class="card">
+    <h3>Net Deposits</h3>
+    <div class="val" data-testid="overview-net-deposits">${{ "%.2f"|format(net_deposits) }}</div>
+  </div>
+  <div class="card">
+    <h3>Net Trading P&amp;L (after fees)</h3>
+    <div class="val {{ 'pos' if trading_pnl >= 0 else 'neg' }}" data-testid="overview-trading-pnl">
+      ${{ "%+.2f"|format(trading_pnl) }}
+    </div>
+  </div>
+  <div class="card">
+    <h3>Open Risk / Positions</h3>
+    <div class="val">${{ "%.2f"|format(open_risk_usd) }} ({{ open_positions_count }})</div>
+  </div>
+  <div class="card">
+    <h3>Circuit Breaker</h3>
+    <div class="val" data-testid="overview-breaker">{{ "TRIPPED" if breaker.tripped else "OK" }}</div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Equity &amp; Cash-Flow Curve</h3>
+  <canvas id="eqChart" height="80"></canvas>
+</div>
+<script>
+  const pts = {{ eq_points | tojson }};
+  if (pts.length && window.Chart) {
+    new Chart(document.getElementById('eqChart'), {
+      type: 'line',
+      data: {
+        labels: pts.map(p => p.ts),
+        datasets: [{ label: 'Cash Balance ($)', data: pts.map(p => p.balance), borderColor: '#38bdf8', tension: 0.15 }]
+      }
+    });
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Positions &amp; Orders</h2>
+
+{% if pending_orders %}
+<div class="card" style="margin-bottom:1.5rem;border-color:#f59e0b;" data-testid="pending-approvals-card">
+  <h3>Pending Approval Orders (Approval Mode)</h3>
+  <table>
+    <thead>
+      <tr><th>Order ID</th><th>Signal ID</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Price</th><th>Stop</th><th>Target</th><th>Action</th></tr>
+    </thead>
+    <tbody>
+      {% for o in pending_orders %}
+      <tr data-testid="pending-order-row">
+        <td>{{ o.id[:8] }}</td>
+        <td>{{ o.signal_id }}</td>
+        <td>{{ o.symbol }}</td>
+        <td>{{ o.side }}</td>
+        <td>{{ "%.2f"|format(o.qty) }}</td>
+        <td>{{ "%.2f"|format(o.requested_price) }}</td>
+        <td>{{ "%.2f"|format(o.stop) if o.stop else '-' }}</td>
+        <td>{{ "%.2f"|format(o.target) if o.target else '-' }}</td>
+        <td style="display:flex;gap:0.4rem;">
+          <form method="post" action="/orders/{{ o.id }}/decision">
+            <input type="hidden" name="decision" value="approve" />
+            <button type="submit" class="btn-success" data-testid="approve-order-btn">Approve</button>
+          </form>
+          <form method="post" action="/orders/{{ o.id }}/decision">
+            <input type="hidden" name="decision" value="reject" />
+            <button type="submit" class="btn-danger" data-testid="reject-order-btn">Reject</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div class="card" style="margin-bottom:1.5rem;">
+  <h3>Open Broker Positions</h3>
+  <table data-testid="open-positions-table">
+    <thead>
+      <tr><th>Symbol</th><th>Direction</th><th>Qty</th><th>Avg Entry</th><th>Stop</th><th>Target</th><th>Unrealized P&amp;L</th></tr>
+    </thead>
+    <tbody>
+      {% for p in live_positions %}
+      <tr>
+        <td>{{ p.symbol }}</td>
+        <td>{{ p.direction }}</td>
+        <td>{{ "%.2f"|format(p.qty) }}</td>
+        <td>{{ "%.2f"|format(p.avg_price) }}</td>
+        <td>{{ "%.2f"|format(p.stop) if p.stop else '-' }}</td>
+        <td>{{ "%.2f"|format(p.target) if p.target else '-' }}</td>
+        <td class="{{ 'pos' if p.unrealized_pnl >= 0 else 'neg' }}">${{ "%+.2f"|format(p.unrealized_pnl) }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" style="color:#94a3b8;">No open positions.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h3>Recent Orders</h3>
+  <table>
+    <thead>
+      <tr><th>Time</th><th>Client Order ID</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Fill Price</th><th>Status</th><th>Reason</th></tr>
+    </thead>
+    <tbody>
+      {% for o in orders %}
+      <tr>
+        <td>{{ o.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        <td>{{ o.client_order_id }}</td>
+        <td>{{ o.symbol }}</td>
+        <td>{{ o.side }}</td>
+        <td>{{ "%.2f"|format(o.qty) }}</td>
+        <td>{{ "%.2f"|format(o.fill_price) if o.fill_price else '-' }}</td>
+        <td data-testid="order-status-{{ o.signal_id }}">{{ o.status }}</td>
+        <td>{{ o.reason or '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

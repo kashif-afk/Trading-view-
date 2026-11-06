@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Login — XAUUSD Execution Dashboard</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; height: 100vh; align-items: center; justify-content: center; }
+    .login-box { background: #1e293b; border: 1px solid #334155; padding: 2rem; border-radius: 8px; width: 340px; }
+    h2 { margin-top: 0; }
+    label { display: block; margin-top: 0.85rem; font-size: 0.85rem; color: #94a3b8; }
+    input { width: 100%; padding: 0.55rem; margin-top: 0.3rem; background: #0f172a; border: 1px solid #334155; color: #fff; border-radius: 6px; box-sizing: border-box; }
+    button { width: 100%; margin-top: 1.25rem; padding: 0.65rem; background: #0284c7; border: none; color: #fff; font-weight: 700; border-radius: 6px; cursor: pointer; }
+    .err { color: #ef4444; font-size: 0.85rem; margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <h2>XAUUSD Engine Login</h2>
+    {% if error %}<div class="err" data-testid="login-error">{{ error }}</div>{% endif %}
+    <form method="post" action="/login">
+      <label>Username</label>
+      <input type="text" name="username" required autofocus data-testid="login-username" />
+      <label>Password</label>
+      <input type="password" name="password" required data-testid="login-password" />
+      <label>TOTP Code (if enabled)</label>
+      <input type="text" name="totp_code" placeholder="Optional 6-digit code" data-testid="login-totp" />
+      <button type="submit" data-testid="login-submit">Sign In</button>
+    </form>
+  </div>
+</body>
+</html>

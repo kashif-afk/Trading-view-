@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Signals Audit Trail &amp; Memory Recall Advisory</h2>
+<div class="card">
+  <table data-testid="signals-table">
+    <thead>
+      <tr>
+        <th>Received (UTC)</th>
+        <th>Signal ID</th>
+        <th>Symbol</th>
+        <th>Action</th>
+        <th>Price / Stop / Target</th>
+        <th>Status</th>
+        <th>Decision Reason</th>
+        <th>Advisory (Similar Past Setups)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in signals %}
+      <tr data-testid="signal-row-{{ s.signal_id }}">
+        <td>{{ s.received_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        <td data-testid="signal-id-cell">{{ s.signal_id }}</td>
+        <td>{{ s.symbol }} ({{ s.broker_symbol }})</td>
+        <td>{{ s.action }}</td>
+        <td>
+          {{ "%.2f"|format(s.price) }} /
+          {{ "%.2f"|format(s.stop) if s.stop else '-' }} /
+          {{ "%.2f"|format(s.target) if s.target else '-' }}
+        </td>
+        <td><span class="badge {{ 'ok' if s.status=='accepted' else ('approval' if s.status=='pending_approval' else 'danger') }}" data-testid="signal-status">{{ s.status }}</span></td>
+        <td data-testid="signal-reason">{{ s.reason }}</td>
+        <td data-testid="signal-advisory">
+          {% if s.advisory and s.advisory.get('count', 0) > 0 %}
+            n={{ s.advisory.count }}, WR={{ s.advisory.win_rate }}%, avgR={{ s.advisory.avg_r }}
+            {% if s.advisory.top_mistake_tag %}(top tag: {{ s.advisory.top_mistake_tag }}){% endif %}
+          {% else %}
+            n=0 (no prior matches)
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" style="color:#94a3b8;">No signals received yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

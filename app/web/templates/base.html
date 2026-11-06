@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>XAUUSD Execution & Cash-Flow Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a; --panel: #1e293b; --border: #334155; --text: #f8fafc;
+      --muted: #94a3b8; --green: #22c55e; --red: #ef4444; --amber: #f59e0b; --blue: #38bdf8;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+    header { display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1.5rem; background: #090e1a; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 0.75rem; }
+    nav { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    nav a { color: var(--muted); text-decoration: none; padding: 0.4rem 0.75rem; border-radius: 6px; font-weight: 500; }
+    nav a.active, nav a:hover { color: var(--text); background: var(--panel); }
+    main { max-width: 1280px; margin: 1.5rem auto; padding: 0 1.25rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.2rem; }
+    .card h3 { margin: 0 0 0.35rem 0; font-size: 0.8rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.04em; }
+    .card .val { font-size: 1.45rem; font-weight: 700; }
+    .badge { display: inline-block; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+    .badge.paper { background: #0284c7; color: #fff; }
+    .badge.approval { background: var(--amber); color: #000; }
+    .badge.live { background: var(--red); color: #fff; }
+    .badge.ok { background: #166534; color: #dcfce7; }
+    .badge.danger { background: #991b1b; color: #fee2e2; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th, td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border); text-align: left; }
+    th { color: var(--muted); font-weight: 600; background: rgba(15,23,42,0.45); }
+    button, .btn { cursor: pointer; padding: 0.45rem 0.85rem; border-radius: 6px; border: 1px solid transparent; font-weight: 600; font-size: 0.85rem; text-decoration: none; display: inline-block; }
+    .btn-danger { background: var(--red); color: #fff; }
+    .btn-success { background: var(--green); color: #052e16; }
+    .btn-secondary { background: #334155; color: var(--text); }
+    input, select, textarea { background: #0f172a; color: var(--text); border: 1px solid var(--border); padding: 0.45rem 0.65rem; border-radius: 6px; }
+    .pos { color: var(--green); }
+    .neg { color: var(--red); }
+  </style>
+</head>
+<body>
+  <header>
+    <div style="display:flex;align-items:center;gap:0.75rem;">
+      <strong>XAUUSD Engine</strong>
+      <span class="badge {{ mode }}" data-testid="mode-badge">{{ mode }}</span>
+      {% if kill_active %}
+        <span class="badge danger" data-testid="kill-status-badge">KILL SWITCH ACTIVE</span>
+      {% else %}
+        <span class="badge ok" data-testid="kill-status-badge">ARMED</span>
+      {% endif %}
+      {% if breaker.tripped %}
+        <span class="badge danger" data-testid="breaker-badge">BREAKER TRIPPED</span>
+      {% endif %}
+    </div>
+    <nav>
+      <a href="/" class="{{ 'active' if page=='overview' else '' }}">Overview</a>
+      <a href="/cashflows" class="{{ 'active' if page=='cashflows' else '' }}">Cash Flows</a>
+      <a href="/positions" class="{{ 'active' if page=='positions' else '' }}">Positions & Orders</a>
+      <a href="/signals" class="{{ 'active' if page=='signals' else '' }}">Signals</a>
+      <a href="/performance" class="{{ 'active' if page=='performance' else '' }}">Performance</a>
+      <a href="/lessons" class="{{ 'active' if page=='lessons' else '' }}">Lessons</a>
+      <a href="/settings" class="{{ 'active' if page=='settings' else '' }}">Settings</a>
+    </nav>
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+      {% if kill_active %}
+        <form method="post" action="/killswitch/reset" style="margin:0;">
+          <button type="submit" class="btn-secondary" data-testid="kill-reset-btn">Reset Kill Switch</button>
+        </form>
+      {% else %}
+        <form method="post" action="/killswitch/engage" style="margin:0;">
+          <input type="hidden" name="reason" value="dashboard_emergency_button" />
+          <button type="submit" class="btn-danger" data-testid="kill-switch-btn">KILL SWITCH</button>
+        </form>
+      {% endif %}
+      <form method="post" action="/logout" style="margin:0;">
+        <button type="submit" class="btn-secondary">Logout ({{ user }})</button>
+      </form>
+    </div>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
