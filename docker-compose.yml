@@ -23,7 +23,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://trader:traderpass@db:5432/trading}
+      DATABASE_URL: postgresql+psycopg://trader:traderpass@db:5432/trading
       DATA_DIR: /app/data
     ports:
       - "8000:8000"
@@ -46,7 +46,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://trader:traderpass@db:5432/trading}
+      DATABASE_URL: postgresql+psycopg://trader:traderpass@db:5432/trading
       DATA_DIR: /app/data
     volumes:
       - appdata:/app/data

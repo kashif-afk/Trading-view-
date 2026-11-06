@@ -1,6 +1,8 @@
 """Database engine, session factory, health probe, and pgvector DDL helper."""
 from __future__ import annotations
 
+import logging
+import socket
 from collections.abc import Iterator
 from contextlib import contextmanager
 
@@ -11,12 +13,25 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.config import Settings, get_settings
 from app.storage.models import Base, ConfigVersion
 
+logger = logging.getLogger(__name__)
 _ENGINE_CACHE: dict[str, Engine] = {}
+
+
+def _resolve_database_url(s: Settings) -> str:
+    url = s.database_url
+    if "@db:" in url or "@db/" in url:
+        try:
+            socket.getaddrinfo("db", 5432)
+        except OSError:
+            fallback = f"sqlite:///{(s.data_dir / 'app.db').as_posix()}"
+            logger.warning("Host 'db' not reachable outside Docker; falling back to local SQLite (%s)", fallback)
+            return fallback
+    return url
 
 
 def get_engine(settings: Settings | None = None) -> Engine:
     s = settings or get_settings()
-    url = s.database_url
+    url = _resolve_database_url(s)
     if url not in _ENGINE_CACHE:
         connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
         _ENGINE_CACHE[url] = create_engine(url, pool_pre_ping=True, future=True, connect_args=connect_args)
